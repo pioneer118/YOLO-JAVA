@@ -1,0 +1,58 @@
+### IntelliJ IDEA ###
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+.kotlin
+.idea/
+*.iml
+
+### Claude Code local settings (contains local paths) ###
+.claude/
+
+### Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+### Maven ###
+target/
+
+### Node.js ###
+node_modules/
+dist/
+
+### Logs & JVM crash dumps ###
+logs/
+*.log
+hs_err_pid*.log
+derby.log
+
+### Test / generated data ###
+testimage/
+work/
+test_result.json
+
+### Model files (large binary, use Git LFS if needed) ###
+models/*.onnx
+models/*.pt
+models/*.pth
+
+### Mac OS ###
+.DS_Store

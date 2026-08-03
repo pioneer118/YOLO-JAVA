@@ -1,0 +1,55 @@
+# Ultralytics YOLO 🚀, AGPL-3.0 license
+# DOTA 1.5 dataset https://captain-whu.github.io/DOTA/index.html for object detection in aerial images by Wuhan University
+# Documentation: https://docs.ultralytics.com/datasets/obb/dota-v2/
+# Example usage: yolo train model=yolov8n-obb.pt data=DOTAv1.5.yaml
+# parent
+# ├── ultralytics
+# └── datasets
+#     └── dota1.5  ← downloads here (2GB)
+
+# Train/val/test sets as 1) dir: path/to/imgs, 2) file: path/to/imgs.txt, or 3) list: [path/to/imgs1, path/to/imgs2, ..]
+path: G:/L3_plane_ship/D1-ship # dataset root dir
+train: images/train # train images (relative to 'path') 1411 images
+val: images/train # val images (relative to 'path') 458 images
+test: images/test # test images (optional) 937 images
+
+# Classes for DOTA 1.5
+names:
+  0: Wasp #黄蜂级
+  1: Newport #新港级
+  2: Lewis_Clark #刘易斯和克拉克级
+  3: Supply #供应级
+  4: Kaiser #凯泽级
+  5: Hope #霍普级
+  6: Mercy #仁慈级
+  7: Freedom #自由级
+  8: Independence #独立级
+  9: Avenger #复仇者级
+  10: submarine #潜艇
+  11: other-ship #
+  12: merchant_ship #商船
+  13: Nimitz #尼米兹级航母
+  14: Enterprise #企业级航母
+  15: Arleigh_Burke #阿利伯克级驱逐舰
+  16: WhidbeyIsland #惠德贝岛级船坞登陆舰
+  17: Perry #佩里级护卫舰
+  18: Sanantonio #圣安东尼奥级两栖船坞运输舰
+  19: Ticonderoga #提康德罗加级巡洋舰
+  20: Kitty_Hawk #小鹰级航母
+  21: Kuznetsov #俄罗斯库兹涅佐夫号航母
+  22: Abukuma #阿武隈级护卫舰
+  23: Austen #奥斯汀级两栖船坞运输舰
+  24: Tarawa #塔拉瓦级通用两栖攻击舰
+  25: Blue_Ridge #蓝岭级指挥舰
+  26: Container #集装箱货船
+  27: OXo|--) #尾部OX头部圆指挥舰
+  28: Car_carrier #运输汽车船
+  29: Hovercraft #气垫船
+  30: yacht #游艇
+  31: CntShip #货船
+  32: Cruise #游轮
+  33: lute #琵琶形军舰
+  34: Medical #医疗船
+  35: Ford-class #福特级航空母舰
+  36: Midway-class #中途号航母
+  37: Invincible-class #无敌级航空母舰

@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: yolo-web-api
+  servlet:
+    multipart:
+      max-file-size: 500MB
+      max-request-size: 600MB
+
+server:
+  port: 8080
+
+dubbo:
+  application:
+    name: ${spring.application.name}
+  registry:
+    address: nacos://127.0.0.1:8848
+  consumer:
+    timeout: 600000
+    check: false

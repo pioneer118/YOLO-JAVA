@@ -1,0 +1,61 @@
+syntax = "proto3";
+package yolo;
+option java_package = "com.yolo.proto";
+option java_multiple_files = true;
+
+// ============================================================
+// 单张图片检测 — 请求（后端推理使用）
+// ============================================================
+message ModelDetectRequest {
+    bytes  image_data     = 1;   // JPEG/PNG 编码的图片二进制数据
+    float  conf_threshold = 2;   // 置信度阈值（默认 0.5）
+    string data_source    = 3;   // 数据来源：satellite / drone（预留）
+}
+
+// ============================================================
+// 单张图片检测 — 请求（网关聚合使用，客户端调用）
+// ============================================================
+message AggregateDetectRequest {
+    bytes  image_data     = 1;   // JPEG/PNG 编码的图片二进制数据
+    float  conf_threshold = 2;   // 置信度阈值（默认 0.5）
+    string data_source    = 3;   // 数据来源：satellite / drone（预留）
+}
+
+// ============================================================
+// 旋转边界框
+// ============================================================
+message BoundingBox {
+    float x1 = 1; float y1 = 2;
+    float x2 = 3; float y2 = 4;
+    float x3 = 5; float y3 = 6;
+    float x4 = 7; float y4 = 8;
+}
+
+// ============================================================
+// 单个检测目标
+// ============================================================
+message Detection {
+    int32       class_id    = 1;
+    string      class_name  = 2;
+    float       confidence  = 3;
+    BoundingBox bbox        = 4;
+}
+
+// ============================================================
+// 后端推理响应（不包含标注图，交给网关统一绘制）
+// ============================================================
+message ModelDetectResponse {
+    repeated Detection detections         = 1;
+    int32              total_count        = 2;
+    int32              processing_time_ms = 3;
+}
+
+// ============================================================
+// 网关聚合响应（包含标注图）
+// ============================================================
+message AggregateDetectResponse {
+    repeated Detection detections         = 1;
+    int32              total_count        = 2;
+    bytes              annotated_image    = 3;   // JPEG 标注图
+    int32              processing_time_ms = 4;
+}

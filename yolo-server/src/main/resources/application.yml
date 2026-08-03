@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: yolo-server
+
+dubbo:
+  application:
+    name: ${spring.application.name}
+  protocol:
+    name: tri
+    port: 0
+  registry:
+    address: nacos://127.0.0.1:8848
+    register-mode: instance
+  provider:
+    timeout: 30000
+  scan:
+    base-packages: com.yolo.server
+
+yolo:
+  model-path: ""
+  model-type: ship
+
+# ---- Actuator + Prometheus 指标暴露 ----
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: ${spring.application.name}
+  server:
+    port: 8100  # 管理端口（与 Dubbo 业务端口分离）

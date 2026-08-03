@@ -1,0 +1,56 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', Arial, sans-serif;
+  background: #1a1a2e;
+}
+
+#app {
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* App.vue 的根容器 */
+#app-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#app-container > .el-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.el-header {
+  flex-shrink: 0;
+}
+
+.el-main {
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
+}
+
+.el-footer {
+  flex-shrink: 0;
+}
+
+/* 强制 router-view 填满 el-main */
+.el-main > * {
+  height: 100%;
+  overflow: hidden;
+}

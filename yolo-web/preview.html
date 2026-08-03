@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YOLO 分布式目标检测系统 — 效果模拟 v2</title>
+<link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#1a1a2e; font-family:'Helvetica Neue','PingFang SC','Microsoft YaHei',sans-serif; color:#e0e0e0; overflow:hidden; height:100vh; }
+
+/* 顶部导航 */
+.header { background:#16213e; border-bottom:1px solid #0f3460; padding:0 24px; display:flex; align-items:center; height:56px; flex-shrink:0; }
+.header .logo { font-size:17px; font-weight:700; color:#e0e0e0; }
+.header .logo span { color:#409eff; }
+.header nav { margin-left:36px; display:flex; gap:4px; }
+.header nav a { padding:8px 18px; color:#a0a0b0; text-decoration:none; font-size:13px; border-radius:6px; transition:all .2s; }
+.header nav a.active, .header nav a:hover { color:#fff; background:rgba(64,158,255,0.15); }
+
+/* 三栏布局 */
+.layout { display:flex; height:calc(100vh - 56px); }
+.left   { width:360px; flex-shrink:0; background:#16213e; overflow-y:auto; border-right:1px solid #0f3460; }
+.center { flex:1; min-width:0; position:relative; background:#0a0a1a; }
+.right  { width:340px; flex-shrink:0; background:#16213e; overflow-y:auto; border-left:1px solid #0f3460; }
+
+/* 暗色滚动条 */
+.left::-webkit-scrollbar, .right::-webkit-scrollbar { width:5px; }
+.left::-webkit-scrollbar-thumb, .right::-webkit-scrollbar-thumb { background:#0f3460; border-radius:3px; }
+
+/* 面板区块 */
+.section { padding:16px 20px; border-bottom:1px solid #0f3460; }
+.section-title { font-size:13px; font-weight:600; color:#a0a0b0; margin-bottom:12px; text-transform:uppercase; letter-spacing:1px; }
+
+/* 数据来源 */
+.source-tabs { display:flex; background:#0f3460; border-radius:6px; padding:3px; }
+.source-tab { flex:1; text-align:center; padding:8px 12px; border-radius:5px; font-size:13px; cursor:pointer; color:#a0a0b0; transition:all .2s; }
+.source-tab.active { background:#409eff; color:#fff; }
+
+/* 目标勾选 */
+.target-checks { display:flex; flex-direction:column; gap:10px; }
+.target-check { display:flex; align-items:center; gap:10px; padding:10px 14px; background:#0f3460; border-radius:6px; cursor:pointer; transition:all .2s; }
+.target-check:hover { background:rgba(64,158,255,0.15); }
+
+/* 自定义勾选框 */
+.cb { width:18px; height:18px; border-radius:4px; border:2px solid #334; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all .2s; }
+.target-check.checked .cb { background:#409eff; border-color:#409eff; }
+.target-check.checked .cb::after { content:'✓'; color:#fff; font-size:11px; font-weight:700; }
+
+.target-icon { font-size:20px; }
+.target-label { font-size:14px; color:#c0c0d0; flex:1; }
+.target-hint { font-size:11px; color:#707080; }
+
+/* 表单控件 */
+.form-group { margin-bottom:14px; }
+.form-label { font-size:12px; color:#808090; margin-bottom:5px; display:block; }
+
+.input-dark, .select-dark { width:100%; padding:9px 12px; background:#0f3460; border:1px solid #1a3a6e; border-radius:5px; color:#e0e0e0; font-size:13px; outline:none; transition:border .2s; }
+.input-dark:focus, .select-dark:focus { border-color:#409eff; }
+.input-dark::placeholder { color:#506080; }
+.select-dark { appearance:none; cursor:pointer; }
+
+/* 滑块 */
+.range-wrap { position:relative; }
+.range-wrap input[type=range] { width:100%; appearance:none; height:6px; background:#0f3460; border-radius:3px; outline:none; }
+.range-wrap input[type=range]::-webkit-slider-thumb { appearance:none; width:18px; height:18px; background:#409eff; border-radius:50%; cursor:pointer; }
+.range-labels { display:flex; justify-content:space-between; font-size:11px; color:#506080; margin-top:4px; }
+
+/* 上传区 */
+.upload-zone { border:2px dashed #1a3a6e; border-radius:8px; padding:28px 20px; text-align:center; cursor:pointer; transition:all .2s; }
+.upload-zone:hover { border-color:#409eff; background:rgba(64,158,255,0.05); }
+.upload-zone .icon { font-size:36px; margin-bottom:8px; }
+.upload-zone p { font-size:13px; color:#808090; }
+.upload-zone .hint { font-size:11px; color:#506080; margin-top:6px; }
+
+/* 计算结果显示 */
+.calc-box { background:#0f3460; border-radius:6px; padding:12px 14px; margin-top:12px; }
+.calc-row { display:flex; justify-content:space-between; padding:3px 0; font-size:12px; }
+.calc-row .k { color:#707080; }
+.calc-row .v { color:#c0c0d0; font-weight:600; }
+.calc-row .v.good { color:#67c23a; }
+.calc-row .v.warn { color:#e6a23c; }
+
+/* 按钮 */
+.btn-detect { width:100%; padding:12px; background:#409eff; color:#fff; border:none; border-radius:6px; font-size:14px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; transition:all .2s; }
+.btn-detect:hover { background:#337ecc; }
+.btn-detect:disabled { background:#1a3a6e; color:#506080; cursor:not-allowed; }
+.btn-reset { width:100%; padding:10px; background:transparent; color:#a0a0b0; border:1px solid #1a3a6e; border-radius:6px; font-size:13px; cursor:pointer; margin-top:10px; transition:all .2s; }
+.btn-reset:hover { color:#fff; border-color:#409eff; }
+
+/* 地图容器 */
+#map { height:100%; width:100%; }
+.map-watermark { position:absolute; bottom:8px; left:12px; font-size:11px; color:rgba(255,255,255,0.5); z-index:1000; }
+.map-coords { position:absolute; bottom:8px; right:12px; font-size:11px; color:rgba(255,255,255,0.4); z-index:1000; }
+.layer-ctrl { position:absolute; top:12px; right:12px; background:rgba(22,33,62,0.95); border-radius:6px; padding:10px 14px; z-index:1000; font-size:12px; border:1px solid #0f3460; }
+.layer-ctrl label { display:block; margin:5px 0; cursor:pointer; color:#c0c0d0; }
+
+/* 右侧 — 检测结果 */
+.empty-result { text-align:center; padding:60px 20px; color:#506080; }
+.empty-result .icon { font-size:48px; margin-bottom:12px; }
+.empty-result p { font-size:13px; }
+
+.result-header { padding:14px 20px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.result-header .tag { padding:4px 10px; border-radius:4px; font-size:12px; font-weight:600; }
+.tag-green { background:rgba(103,194,58,0.15); color:#67c23a; }
+.tag-blue  { background:rgba(64,158,255,0.15); color:#409eff; }
+.tag-orange{ background:rgba(230,162,60,0.15); color:#e6a23c; }
+
+.result-list { }
+.result-item { display:flex; align-items:center; gap:10px; padding:10px 20px; border-bottom:1px solid #0f3460; cursor:pointer; transition:all .15s; }
+.result-item:hover { background:rgba(64,158,255,0.08); }
+.result-item .idx { width:22px; height:22px; border-radius:50%; background:#409eff; color:#fff; font-size:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.result-item .info { flex:1; min-width:0; }
+.result-item .info .cls { font-size:13px; color:#e0e0e0; }
+.result-item .info .source { font-size:11px; color:#707080; }
+.result-item .conf-bar { width:50px; height:4px; background:#0f3460; border-radius:2px; margin-top:4px; }
+.result-item .conf-bar .fill { height:100%; border-radius:2px; }
+.conf-high { background:#67c23a; }
+.conf-mid  { background:#e6a23c; }
+.conf-low  { background:#f56c6c; }
+
+/* 地图上的 marker */
+.marker-dot { background:#67c23a; color:#fff; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; border:2px solid #fff; box-shadow:0 2px 6px rgba(0,0,0,0.4); }
+.marker-drone { background:#409eff; color:#fff; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-size:14px; border:2px solid #fff; box-shadow:0 2px 8px rgba(64,158,255,0.5); }
+
+/* Popup */
+.leaflet-popup-content-wrapper { background:#16213e; color:#e0e0e0; border-radius:6px; }
+.leaflet-popup-tip { background:#16213e; }
+.popup-inner { min-width:200px; }
+.popup-inner b { color:#fff; }
+
+/* 动画 */
+@keyframes pulse { 0%,100% { box-shadow:0 0 0 0 rgba(64,158,255,0.4); } 50% { box-shadow:0 0 0 12px rgba(64,158,255,0); } }
+.drone-pulse { animation:pulse 2s infinite; }
+</style>
+</head>
+<body>
+
+<!-- 顶部导航 -->
+<div class="header">
+  <div class="logo">🛰️ <span>YOLO</span> 分布式目标检测系统</div>
+  <nav>
+    <a href="#" class="active">🔍 检测</a>
+    <a href="#">📊 系统状态</a>
+  </nav>
+</div>
+
+<!-- 三栏布局 -->
+<div class="layout">
+
+  <!-- ============ 左栏：参数设置 ============ -->
+  <div class="left">
+
+    <!-- 数据来源 -->
+    <div class="section">
+      <div class="section-title">📡 数据来源</div>
+      <div class="source-tabs">
+        <div class="source-tab active" id="tabSat" onclick="switchSource('satellite')">🛰️ 卫星遥感</div>
+        <div class="source-tab" id="tabDrone" onclick="switchSource('drone')">🛸 无人机</div>
+      </div>
+    </div>
+
+    <!-- 检测目标 -->
+    <div class="section">
+      <div class="section-title">🎯 检测目标</div>
+      <div class="target-checks">
+        <div class="target-check checked" onclick="toggleCheck(this)">
+          <span class="cb"></span>
+          <span class="target-icon">🚢</span>
+          <span class="target-label">舰船</span>
+          <span class="target-hint">ship</span>
+        </div>
+        <div class="target-check checked" onclick="toggleCheck(this)">
+          <span class="cb"></span>
+          <span class="target-icon">✈️</span>
+          <span class="target-label">飞机</span>
+          <span class="target-hint">plane</span>
+        </div>
+        <div class="target-check checked" onclick="toggleCheck(this)">
+          <span class="cb"></span>
+          <span class="target-icon">🚗</span>
+          <span class="target-label">车辆</span>
+          <span class="target-hint">car</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 无人机参数 -->
+    <div id="droneSection" style="display:none">
+      <div class="section">
+        <div class="section-title">🛸 无人机参数</div>
+        <div class="form-group">
+          <span class="form-label">无人机型号</span>
+          <select class="select-dark"><option>DJI Mini 3</option><option>DJI Mavic 3</option><option>DJI Phantom 4</option><option>自定义...</option></select>
+        </div>
+        <div class="form-group">
+          <span class="form-label">飞行高度 (m，海拔)</span>
+          <input class="input-dark" type="number" value="120" placeholder="输入飞行高度">
+        </div>
+        <div class="form-group">
+          <span class="form-label">相机俯仰角 (°)</span>
+          <input class="input-dark" type="number" value="90" placeholder="0=水平, 90=正射">
+          <span style="font-size:11px;color:#506080;">0°=水平, 90°=垂直向下正射</span>
+        </div>
+        <div class="form-group">
+          <span class="form-label">纬度（可选）</span>
+          <input class="input-dark" placeholder="例如 30.123456">
+        </div>
+        <div class="form-group">
+          <span class="form-label">经度（可选）</span>
+          <input class="input-dark" placeholder="例如 120.123456">
+        </div>
+
+        <!-- GSD 实时计算 -->
+        <div class="calc-box">
+          <div class="calc-row"><span class="k">GSD</span><span class="v">4.3 cm/px</span></div>
+          <div class="calc-row"><span class="k">覆盖范围</span><span class="v">172m × 129m</span></div>
+          <div class="calc-row"><span class="k">裁切建议</span><span class="v good">无需裁切</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 置信度 -->
+    <div class="section">
+      <div class="section-title">📊 置信度阈值</div>
+      <div class="range-wrap">
+        <input type="range" min="10" max="100" value="50">
+        <div class="range-labels"><span>0.10</span><span style="color:#409eff;font-weight:600;">0.50</span><span>1.00</span></div>
+      </div>
+    </div>
+
+    <!-- 上传 -->
+    <div class="section">
+      <div class="section-title">📷 上传图片</div>
+      <div class="upload-zone">
+        <div class="icon">📁</div>
+        <p>将图片拖拽到此处，或点击选择文件</p>
+        <div class="hint">支持 JPG / PNG / TIFF | 最大 500MB</div>
+      </div>
+    </div>
+
+    <!-- 按钮 -->
+    <div class="section">
+      <button class="btn-detect" onclick="startDetect()">🔍 开始检测</button>
+      <button class="btn-reset" onclick="resetAll()" id="resetBtn">🔄 重新开始</button>
+    </div>
+  </div>
+
+  <!-- ============ 中栏：三维地球（始终可见）============ -->
+  <div class="center">
+    <div id="map"></div>
+    <div class="map-watermark">Leaflet | Esri World Imagery | 地图始终可见</div>
+    <div class="map-coords" id="coordDisplay">32.082°N, 118.722°E | Zoom 15</div>
+    <div class="layer-ctrl">
+      <label><input type="checkbox" checked> 🛰️ 卫星底图</label>
+      <label><input type="checkbox" checked id="layerOverlay"> 🖼️ 影像叠加</label>
+      <label><input type="checkbox" checked id="layerMarkers"> 🎯 检测标记 (0)</label>
+    </div>
+  </div>
+
+  <!-- ============ 右栏：检测结果 ============ -->
+  <div class="right" id="rightPanel">
+    <!-- 空状态 -->
+    <div class="empty-result" id="emptyResult">
+      <div class="icon">📋</div>
+      <p>暂无检测结果</p>
+      <p style="font-size:12px;margin-top:8px;color:#405070;">上传图片并点击「开始检测」<br>结果将显示在此处</p>
+      <p style="font-size:11px;margin-top:16px;color:#405070;">💡 检测结果会同步显示在地图上</p>
+    </div>
+
+    <!-- 结果状态 (初始隐藏) -->
+    <div id="resultContent" style="display:none">
+      <div class="result-header">
+        <span class="tag tag-green">🎯 27 个目标</span>
+        <span class="tag tag-blue">⏱ 684ms</span>
+        <span class="tag tag-orange">🧩 1 片</span>
+      </div>
+      <div class="result-list" id="resultList"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ========== 状态 ==========
+let isDrone = false;
+let detecting = false;
+let map, overlay, markersLayer, droneMarker;
+let detResults = [];
+
+// ========== 数据来源切换 ==========
+function switchSource(type) {
+  isDrone = type === 'drone';
+  document.getElementById('tabSat').classList.toggle('active', !isDrone);
+  document.getElementById('tabDrone').classList.toggle('active', isDrone);
+  document.getElementById('droneSection').style.display = isDrone ? 'block' : 'none';
+}
+
+// ========== 目标勾选 ==========
+function toggleCheck(el) {
+  el.classList.toggle('checked');
+}
+
+// ========== 检测 ==========
+function startDetect() {
+  detecting = true;
+  document.getElementById('emptyResult').style.display = 'none';
+  document.getElementById('resultContent').style.display = 'block';
+  document.getElementById('resetBtn').style.display = 'block';
+  initMapIfNeeded();
+  showDetectionResults();
+}
+
+function resetAll() {
+  detecting = false;
+  document.getElementById('emptyResult').style.display = 'block';
+  document.getElementById('resultContent').style.display = 'none';
+  document.getElementById('resetBtn').style.display = 'none';
+  // 清除地图叠加
+  if (overlay) { map.removeLayer(overlay); overlay = null; }
+  if (markersLayer) { map.removeLayer(markersLayer); markersLayer = null; }
+  // 更新图层标签
+  document.getElementById('layerOverlay').parentElement.querySelector('span') && null;
+  updateLayerLabels(0);
+}
+
+// ========== 初始化地图（始终显示）==========
+function initMapIfNeeded() {
+  if (map) return;
+
+  map = L.map('map', {
+    center: [32.082, 118.722],
+    zoom: 15,
+    zoomControl: false,
+    attributionControl: false,
+  });
+
+  // 卫星底图
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19,
+  }).addTo(map);
+
+  // 缩放控件放在左下角
+  L.control.zoom({ position: 'bottomleft' }).addTo(map);
+
+  // 鼠标坐标
+  map.on('mousemove', function(e) {
+    document.getElementById('coordDisplay').textContent =
+      e.latlng.lat.toFixed(5) + '°N, ' + e.latlng.lng.toFixed(5) + '°E | Zoom ' + map.getZoom();
+  });
+}
+
+// ========== 显示检测结果 ==========
+function showDetectionResults() {
+  // 模拟检测数据
+  const ships = [
+    { cls:'[ship] 航空母舰', conf:95, lat:32.0835, lng:118.7202 },
+    { cls:'[ship] 驱逐舰',   conf:92, lat:32.0828, lng:118.7195 },
+    { cls:'[ship] 护卫舰',   conf:89, lat:32.0841, lng:118.7218 },
+    { cls:'[ship] 驱逐舰',   conf:87, lat:32.0830, lng:118.7225 },
+    { cls:'[ship] 补给舰',   conf:72, lat:32.0815, lng:118.7188 },
+    { cls:'[plane] 战斗机',  conf:91, lat:32.0853, lng:118.7240 },
+    { cls:'[car] 军用车辆',  conf:83, lat:32.0805, lng:118.7170 },
+    { cls:'[ship] 巡洋舰',   conf:78, lat:32.0848, lng:118.7232 },
+  ];
+  detResults = ships;
+
+  // ===== 右侧列表 =====
+  const list = document.getElementById('resultList');
+  list.innerHTML = ships.map((d, i) => `
+    <div class="result-item" onmouseenter="highlightMarker(${i})" onmouseleave="unhighlightMarker(${i})" onclick="flyToMarker(${i})">
+      <div class="idx">${i+1}</div>
+      <div class="info">
+        <div class="cls">${d.cls}</div>
+        <div class="source">${d.conf}% 置信度</div>
+        <div class="conf-bar"><div class="fill ${d.conf>85?'conf-high':d.conf>60?'conf-mid':'conf-low'}" style="width:${d.conf}%"></div></div>
+      </div>
+    </div>
+  `).join('');
+
+  // ===== 地图叠加 =====
+  // TIFF 影像边界
+  const bounds = [[32.080, 118.716], [32.086, 118.725]];
+  overlay = L.rectangle(bounds, {
+    color: '#409eff',
+    weight: 2,
+    fillColor: '#409eff',
+    fillOpacity: 0.10,
+    dashArray: '6 3',
+  }).addTo(map);
+  overlay.bindPopup('<b>📷 检测结果影像</b><br>覆盖: 1.35km × 1.59km<br>GSD: 0.30 m/px<br>目标: 8 个');
+
+  // 目标标记
+  markersLayer = L.layerGroup().addTo(map);
+  ships.forEach((d, i) => {
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="marker-dot">${i+1}</div>`,
+      iconSize: [22, 22],
+      iconAnchor: [11, 11],
+    });
+    const m = L.marker([d.lat, d.lng], { icon }).addTo(markersLayer);
+    m.bindPopup(`<div class="popup-inner"><b>${d.cls}</b><br>置信度: ${d.conf}%</div>`);
+    m._detIndex = i;
+  });
+
+  // 无人机标记 (模拟在影像范围外有一个无人机检测)
+  droneMarker = L.marker([32.069, 118.732], {
+    icon: L.divIcon({
+      className: 'drone-pulse',
+      html: '<div class="marker-drone">📍</div>',
+      iconSize: [28, 28],
+      iconAnchor: [14, 28],
+    })
+  }).addTo(map);
+  droneMarker.bindPopup(`
+    <div class="popup-inner">
+      <b>🛸 无人机检测结果</b><br>
+      DJI Mini 3 | 高度 120m | 俯仰 90°<br>
+      🎯 检测到 3 个目标<br>
+      📍 30.069°N, 118.732°E<br>
+      <a href="#" style="color:#409eff;">点击查看检测图</a>
+    </div>
+  `);
+
+  map.fitBounds(bounds, { padding: [20, 20] });
+
+  // 更新图层标签
+  updateLayerLabels(ships.length);
+
+  // 图层控制
+  document.getElementById('layerOverlay').onchange = function() {
+    this.checked ? overlay.addTo(map) : map.removeLayer(overlay);
+  };
+  document.getElementById('layerMarkers').onchange = function() {
+    this.checked ? markersLayer.addTo(map) : map.removeLayer(markersLayer);
+  };
+}
+
+function updateLayerLabels(n) {
+  document.getElementById('layerMarkers').parentElement.innerHTML =
+    document.getElementById('layerMarkers').parentElement.innerHTML.replace(/\(\d+\)/, '('+n+')');
+}
+
+// 列表 hover ↔ 地图联动
+function highlightMarker(i) {
+  if (!markersLayer) return;
+  markersLayer.eachLayer(function(layer) {
+    if (layer._detIndex === i) {
+      layer.setIcon(L.divIcon({
+        className: '',
+        html: `<div class="marker-dot" style="background:#e6a23c;width:28px;height:28px;font-size:12px;">${i+1}</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+      }));
+    }
+  });
+}
+function unhighlightMarker(i) {
+  if (!markersLayer) return;
+  markersLayer.eachLayer(function(layer) {
+    if (layer._detIndex === i) {
+      layer.setIcon(L.divIcon({
+        className: '',
+        html: `<div class="marker-dot">${i+1}</div>`,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+      }));
+    }
+  });
+}
+function flyToMarker(i) {
+  if (!markersLayer) return;
+  markersLayer.eachLayer(function(layer) {
+    if (layer._detIndex === i) {
+      map.flyTo(layer.getLatLng(), 17);
+      layer.openPopup();
+    }
+  });
+}
+
+// 初始加载地图
+initMapIfNeeded();
+</script>
+</body>
+</html>
