@@ -19,6 +19,13 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter</artifactId>
         </dependency>
+        <!-- 添加 web 容器（Tomcat），使 Actuator 端点能被 HTTP 访问。
+             之前只有 spring-boot-starter（无 web），导致 management.server.port:8100
+             的 /actuator/prometheus 端点无法暴露，Prometheus 抓取不到真实指标。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.apache.dubbo</groupId>
             <artifactId>dubbo-spring-boot-starter</artifactId>
