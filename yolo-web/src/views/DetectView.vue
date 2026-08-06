@@ -352,13 +352,13 @@ function downloadCSV() {
 /* ===== 布局 ===== */
 .detect-app {
   display: flex;
-  height: 100%;
+  height: calc(100vh - 60px);
   background: #1a1a2e;
   color: #e0e0e0;
 }
-.left-panel   { width: 340px; flex-shrink: 0; background: #16213e; overflow-y: auto; border-right: 1px solid #0f3460; }
-.center-panel { flex: 1; min-width: 0; background: #0a0a1a; position: relative; overflow: hidden; }
-.right-panel  { width: 300px; flex-shrink: 0; background: #16213e; overflow-y: auto; border-left: 1px solid #0f3460; }
+.left-panel   { width: 340px; flex-shrink: 0; background: #16213e; overflow-y: auto; border-right: 1px solid #0f3460; height: calc(100vh - 60px); }
+.center-panel { flex: 1; min-width: 0; background: #0a0a1a; position: relative; overflow: hidden; height: calc(100vh - 60px); }
+.right-panel  { width: 300px; flex-shrink: 0; background: #16213e; overflow-y: auto; border-left: 1px solid #0f3460; height: calc(100vh - 60px); }
 
 .left-panel::-webkit-scrollbar, .right-panel::-webkit-scrollbar { width: 5px; }
 .left-panel::-webkit-scrollbar-thumb, .right-panel::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 3px; }

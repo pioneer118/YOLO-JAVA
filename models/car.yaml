@@ -1,0 +1,6 @@
+ path: /mnt/data5/wkl2/vehicle_dataset/D1-tank
+train: images/train
+val: images/val
+
+names:
+  0: tank

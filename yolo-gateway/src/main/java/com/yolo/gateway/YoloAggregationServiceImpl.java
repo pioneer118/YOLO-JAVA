@@ -57,7 +57,7 @@ public class YoloAggregationServiceImpl implements YoloAggregationService {
     private int maxConcurrentTiles;
 
     /** 单批次处理 tile 数（每一批内并行扇出模型） */
-    private static final int BATCH_SIZE = 8;
+    private static final int BATCH_SIZE = 4;
 
     /** 跨 tile NMS 的 IoU 阈值 */
     private static final float CROSS_TILE_IOU_THRESHOLD = 0.5f;
@@ -437,7 +437,7 @@ public class YoloAggregationServiceImpl implements YoloAggregationService {
         return CompletableFuture
                 .supplyAsync(supplier, executor)
                 .thenApply(response -> ModelResult.success(modelType, response))
-                .completeOnTimeout(ModelResult.timeout(modelType), 5, TimeUnit.SECONDS)
+                .completeOnTimeout(ModelResult.timeout(modelType), 15, TimeUnit.SECONDS)
                 .exceptionally(ex -> ModelResult.failed(modelType, ex.getMessage()));
     }
 
@@ -446,7 +446,7 @@ public class YoloAggregationServiceImpl implements YoloAggregationService {
         return CompletableFuture
                 .supplyAsync(supplier, executor)
                 .thenApply(response -> ModelResult.success(modelType, response))
-                .completeOnTimeout(ModelResult.timeout(modelType), 10, TimeUnit.SECONDS)
+                .completeOnTimeout(ModelResult.timeout(modelType), 15, TimeUnit.SECONDS)
                 .exceptionally(ex -> ModelResult.failed(modelType, ex.getMessage()));
     }
 

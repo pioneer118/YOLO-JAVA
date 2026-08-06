@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
+import { Search, Monitor } from '@element-plus/icons-vue'
 const route = useRoute()
 </script>
 

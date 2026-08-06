@@ -24,7 +24,9 @@ public class YoloServerApplication {
     }
 
     @Bean
-    public YoloInferenceEngine inferenceEngine(@Value("${yolo.model-path}") String modelPath) throws OrtException {
-        return new YoloInferenceEngine(modelPath, YoloClassNames.CLASS_NAMES);
+    public YoloInferenceEngine inferenceEngine(
+            @Value("${yolo.model-path}") String modelPath,
+            @Value("${yolo.model-type:ship}") String modelType) throws OrtException {
+        return new YoloInferenceEngine(modelPath, YoloClassNames.forModelType(modelType));
     }
 }

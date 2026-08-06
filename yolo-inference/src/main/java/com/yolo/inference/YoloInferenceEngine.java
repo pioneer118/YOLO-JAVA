@@ -147,33 +147,61 @@ public class YoloInferenceEngine implements AutoCloseable {
         int K = output[0][0].length; // values per detection
         log.fine("ONNX detections: N=" + N + ", K=" + K);
 
+        // Scale from model input space to original image size
+        float scaleX = (float) origW / INPUT_SIZE;
+        float scaleY = (float) origH / INPUT_SIZE;
+
         for (int i = 0; i < N; i++) {
             float[] det = output[0][i];
-            float rawConf = det[6];
-            float confidence = 1.0f / (1.0f + (float) Math.exp(-rawConf));
 
-            if (confidence < options.confidenceThreshold()) continue;
+            DetResult r;
+            if (K >= 7) {
+                // ---- OBB 格式: [cx, cy, w, h, angle, cls_id, raw_conf] ----
+                // 舰船/飞机模型使用旋转边界框，第 7 列是原始 logits，需 sigmoid
+                float rawConf = det[6];
+                float confidence = 1.0f / (1.0f + (float) Math.exp(-rawConf));
+                if (confidence < options.confidenceThreshold()) continue;
 
-            float cx = det[0], cy = det[1], w = det[2], h = det[3], angle = det[4];
-            int clsId = (int) det[5];
+                float cx = det[0], cy = det[1], w = det[2], h = det[3], angle = det[4];
+                int clsId = (int) det[5];
 
-            // Scale from 640x640 to original image size
-            float scaleX = (float) origW / INPUT_SIZE;
-            float scaleY = (float) origH / INPUT_SIZE;
-            cx *= scaleX; cy *= scaleY;
-            w *= scaleX; h *= scaleY;
+                cx *= scaleX; cy *= scaleY;
+                w *= scaleX; h *= scaleY;
 
-            float[] corners = obbToCorners(cx, cy, w, h, angle);
+                float[] corners = obbToCorners(cx, cy, w, h, angle);
 
-            DetResult r = new DetResult();
-            r.classId = clsId;
-            r.className = clsId < classNames.size() ? classNames.get(clsId) : "未知";
-            r.confidence = confidence;
-            r.x1 = corners[0]; r.y1 = corners[1];
-            r.x2 = corners[2]; r.y2 = corners[3];
-            r.x3 = corners[4]; r.y3 = corners[5];
-            r.x4 = corners[6]; r.y4 = corners[7];
-            r.cx = cx; r.cy = cy; r.w = w; r.h = h; r.angle = angle;
+                r = new DetResult();
+                r.classId = clsId;
+                r.confidence = confidence;
+                r.x1 = corners[0]; r.y1 = corners[1];
+                r.x2 = corners[2]; r.y2 = corners[3];
+                r.x3 = corners[4]; r.y3 = corners[5];
+                r.x4 = corners[6]; r.y4 = corners[7];
+                r.cx = cx; r.cy = cy; r.w = w; r.h = h; r.angle = angle;
+            } else if (K >= 6) {
+                // ---- 标准框格式: [x1, y1, x2, y2, conf, cls_id] ----
+                // 车辆模型（ultralytics NMS 导出），置信度已是概率
+                float confidence = det[4];
+                if (confidence < options.confidenceThreshold()) continue;
+
+                float x1 = det[0] * scaleX, y1 = det[1] * scaleY;
+                float x2 = det[2] * scaleX, y2 = det[3] * scaleY;
+                int clsId = (int) det[5];
+
+                r = new DetResult();
+                r.classId = clsId;
+                r.confidence = confidence;
+                r.x1 = x1; r.y1 = y1;
+                r.x2 = x2; r.y2 = y1;
+                r.x3 = x2; r.y3 = y2;
+                r.x4 = x1; r.y4 = y2;
+                r.cx = (x1 + x2) / 2f; r.cy = (y1 + y2) / 2f;
+                r.w = x2 - x1; r.h = y2 - y1; r.angle = 0;
+            } else {
+                continue; // 不支持的输出格式
+            }
+
+            r.className = r.classId < classNames.size() ? classNames.get(r.classId) : "未知";
             detections.add(r);
         }
 

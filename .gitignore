@@ -37,3 +37,14 @@ dist/
 
 ### Mac OS ###
 .DS_Store
+
+### 运行时垃圾文件 ###
+derby.log
+logs/
+hs_err_pid*.log
+replay_pid*.log
+
+### 临时/测试文件 ###
+*.jpg
+test-map.html
+models/backup/

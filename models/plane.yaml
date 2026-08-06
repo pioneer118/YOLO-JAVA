@@ -1,0 +1,38 @@
+# 飞机检测数据集 D1-plane (31 类) — 修正版
+# 修正点: 原 DOTA-plane-L3.yaml 中 val: images/train 有误, 改为 images/val
+path: /mnt/data5/wkl/detection_data/L3_plane_ship/D1-plane
+train: images/train
+val: images/val
+
+names:
+  0: SU-35
+  1: C-130
+  2: C-17
+  3: C-5
+  4: F-16
+  5: TU-160
+  6: E-3
+  7: B-52
+  8: P-3C
+  9: B-1B
+  10: E-8
+  11: TU-22
+  12: F-15
+  13: KC-135
+  14: F-22
+  15: FA-18
+  16: TU-95
+  17: KC-10
+  18: SU-34
+  19: SU-24
+  20: Boeing737
+  21: Boeing777
+  22: Boeing747
+  23: Boeing787
+  24: A320
+  25: A220
+  26: A330
+  27: A350
+  28: C919
+  29: ARJ21
+  30: other-airplane
