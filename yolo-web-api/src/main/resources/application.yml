@@ -1,19 +1,33 @@
+# ============================================================
+# yolo-web-api 的配置文件
+# 作用：告诉 Spring Boot 和 Dubbo，这个服务该怎么运行
+# ============================================================
+
+# ---------- Spring Boot 配置 ----------
 spring:
+  # 应用基本信息
   application:
-    name: yolo-web-api
-  servlet:
+    name: yolo-web-api        # 这个服务的名字叫 yolo-web-api（会注册到 Nacos）
+  # Servlet 容器配置（处理 HTTP 请求的 Tomcat）
+  servlet: #Java 里处理 HTTP 请求的规范/接口
+    # 文件上传配置
     multipart:
-      max-file-size: 500MB
-      max-request-size: 600MB
+      max-file-size: 500MB    # 单次上传单个文件最大 500MB（遥感影像很大，所以放宽）
+      max-request-size: 600MB # 单次 HTTP 请求体最大 600MB（含文件+其他参数）
 
+# ---------- 服务器配置 ----------
 server:
-  port: 8080
+  port: 8080                  # 这个服务的 HTTP 端口：浏览器通过 8080 访问它
 
+# ---------- Dubbo 配置 ----------
 dubbo:
+  # Dubbo 应用信息
   application:
-    name: ${spring.application.name}
+    name: ${spring.application.name}   # Dubbo 应用名 = Spring 应用名（yolo-web-api）
+  # 注册中心配置
   registry:
-    address: nacos://127.0.0.1:8848
+    address: nacos://127.0.0.1:8848    # 服务注册到 Nacos（地址 127.0.0.1，端口 8848）
+  # 消费者配置（web-api 是"调用方"，调用网关）
   consumer:
-    timeout: 600000
-    check: false
+    timeout: 600000           # 调用网关最多等 600000 毫秒 = 10 分钟（推理可能很慢）
+    check: false              # 启动时不检查服务是否存在（避免服务没起就启动失败）

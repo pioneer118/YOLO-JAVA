@@ -63,6 +63,18 @@ public class ImageTiler {
     private static final int TIFF_TYPE_SHORT  = 3;
     private static final int TIFF_TYPE_DOUBLE = 12;
 
+    // ---- GeoKey 键与取值（用于判断坐标系类型）----
+
+    /** GTModelTypeGeoKey：坐标系类型键 ID */
+    private static final int GEO_KEY_MODEL_TYPE = 1024;
+    /** GTModelTypeGeoKey = 1：投影坐标系（ModelPixelScale 单位是米） */
+    private static final int MODEL_TYPE_PROJECTED = 1;
+    /** GTModelTypeGeoKey = 2：地理坐标系（ModelPixelScale 单位是度） */
+    private static final int MODEL_TYPE_GEOGRAPHIC = 2;
+
+    /** 每度纬度的米数近似值（用于把"度/像素"的 GSD 换算成"米/像素"） */
+    private static final double METERS_PER_DEGREE = 111320.0;
+
     // ---- 数据结构 ----
 
     /**
@@ -104,6 +116,22 @@ public class ImageTiler {
      */
     public record GeoTiffMeta(double gsd, double coverageKm2, String level,
                               int imageWidth, int imageHeight) {}
+
+    /**
+     * GeoTIFF 头部解析的原始结果（数值未做任何单位换算）。
+     *
+     * @param imageWidth  图像像素宽度
+     * @param imageHeight 图像像素高度
+     * @param gsdX        像元尺度 X（度/像素 或 米/像素，取决于坐标系）
+     * @param gsdY        像元尺度 Y
+     * @param tieX        ModelTiepoint 原点 X（经度 或 投影米）
+     * @param tieY        ModelTiepoint 原点 Y（纬度 或 投影米）
+     * @param geographic  是否为地理坐标系（true=经纬度 EPSG:4326，false=投影坐标）
+     */
+    private record RawGeoTiff(int imageWidth, int imageHeight,
+                              double gsdX, double gsdY,
+                              double tieX, double tieY,
+                              boolean geographic) {}
 
     // ================================================================
     //  公开 API：自适应分析
@@ -208,79 +236,46 @@ public class ImageTiler {
     }
 
     /**
-     * 从 TIFF 字节中提取 WGS84 地理边界。
+     * 从 TIFF 字节中提取 WGS84 地理边界（四至经纬度）。
      *
-     * <p>读取 ModelTiepoint (投影坐标原点) 和 ModelPixelScale (GSD)，
-     * 将 Web Mercator (EPSG:3857) 坐标转为 WGS84 经纬度。
+     * <p>读取 ModelTiepoint（原点坐标）和 ModelPixelScale（像元尺度），
+     * 根据坐标系类型计算四至：
+     * <ul>
+     *   <li>地理坐标系（EPSG:4326）：tieX/tieY 本身就是经纬度，直接推算</li>
+     *   <li>投影坐标系（Web Mercator）：tieX/tieY 是米坐标，需反算成经纬度</li>
+     * </ul>
      *
      * @param imageBytes 原始图片字节
      * @return 地理边界；不含地理信息时返回全零值
      */
     public static GeoBounds getGeoBounds(byte[] imageBytes) {
-        if (imageBytes == null || imageBytes.length < 8) {
+        RawGeoTiff raw = parseRawGeoTiff(imageBytes);
+        if (raw == null || Double.isNaN(raw.tieX) || Double.isNaN(raw.tieY)) {
             return new GeoBounds(0, 0, 0, 0, 0, 0, 0, 0);
         }
-        try {
-            java.nio.ByteBuffer buf = java.nio.ByteBuffer.wrap(imageBytes);
-            byte b0 = buf.get(), b1 = buf.get();
-            boolean le = (b0 == 0x49 && b1 == 0x49);
-            buf.order(le ? java.nio.ByteOrder.LITTLE_ENDIAN : java.nio.ByteOrder.BIG_ENDIAN);
-            if (buf.getShort() != 42) return new GeoBounds(0, 0, 0, 0, 0, 0, 0, 0);
-            int ifdOff = buf.getInt();
-            if (ifdOff <= 0 || ifdOff >= imageBytes.length) return new GeoBounds(0, 0, 0, 0, 0, 0, 0, 0);
 
-            buf.position(ifdOff);
-            short numEntries = buf.getShort();
-            int imgW = 0, imgH = 0;
-            double tieX = Double.NaN, tieY = Double.NaN, gsdX = -1, gsdY = -1;
-
-            for (int i = 0; i < numEntries; i++) {
-                int tagId = buf.getShort() & 0xFFFF;
-                int dataType = buf.getShort() & 0xFFFF;
-                int count = buf.getInt();
-                int valOff = buf.getInt();
-
-                if (tagId == 256) { // ImageWidth
-                    imgW = (dataType == 3) ? (valOff & 0xFFFF) : valOff;
-                } else if (tagId == 257) { // ImageLength
-                    imgH = (dataType == 3) ? (valOff & 0xFFFF) : valOff;
-                } else if (tagId == 33550 && count >= 2 && dataType == 12) { // ModelPixelScale
-                    int saved = buf.position();
-                    buf.position(valOff);
-                    gsdX = Math.abs(buf.getDouble());
-                    gsdY = Math.abs(buf.getDouble());
-                    buf.position(saved);
-                } else if (tagId == 33922 && count >= 6 && dataType == 12) { // ModelTiepoint
-                    int saved = buf.position();
-                    buf.position(valOff);
-                    buf.getDouble(); buf.getDouble(); buf.getDouble(); // I,J,K
-                    tieX = buf.getDouble();
-                    tieY = buf.getDouble();
-                    buf.position(saved);
-                }
-            }
-
-            if (imgW <= 0 || imgH <= 0 || Double.isNaN(tieX) || gsdX <= 0) {
-                return new GeoBounds(0, 0, 0, 0, 0, 0, 0, 0);
-            }
-
-            // 四角投影坐标 (EPSG:3857 Web Mercator)
-            double westM  = tieX;
-            double eastM  = tieX + imgW * gsdX;
-            double northM = tieY;
-            double southM = tieY - imgH * gsdY;
-
-            // Web Mercator → WGS84
-            double north = mercatorToLat(northM);
-            double south = mercatorToLat(southM);
-            double east  = mercatorToLng(eastM);
-            double west  = mercatorToLng(westM);
-
-            return new GeoBounds(north, south, east, west,
-                    (north + south) / 2.0, (east + west) / 2.0, imgW, imgH);
-        } catch (Exception e) {
-            return new GeoBounds(0, 0, 0, 0, 0, 0, 0, 0);
+        double north, south, east, west;
+        if (raw.geographic) {
+            // 地理坐标系（EPSG:4326）：tieX/tieY 直接就是经纬度，无需反算
+            west  = raw.tieX;
+            north = raw.tieY;
+            east  = raw.tieX + raw.imageWidth * raw.gsdX;
+            south = raw.tieY - raw.imageHeight * raw.gsdY;
+        } else {
+            // 投影坐标系（Web Mercator）：米坐标 → 反算成经纬度
+            double westM  = raw.tieX;
+            double eastM  = raw.tieX + raw.imageWidth * raw.gsdX;
+            double northM = raw.tieY;
+            double southM = raw.tieY - raw.imageHeight * raw.gsdY;
+            north = mercatorToLat(northM);
+            south = mercatorToLat(southM);
+            east  = mercatorToLng(eastM);
+            west  = mercatorToLng(westM);
         }
+
+        return new GeoBounds(north, south, east, west,
+                (north + south) / 2.0, (east + west) / 2.0,
+                raw.imageWidth, raw.imageHeight);
     }
 
     /** Web Mercator Y → 纬度 (度) */
@@ -477,14 +472,16 @@ public class ImageTiler {
     // ================================================================
 
     /**
-     * 轻量级 TIFF 头部解析器，提取 GSD 和图像尺寸。
+     * 轻量级解析 GeoTIFF 头部，提取检测和地理定位所需的原始字段。
      *
-     * <p>不依赖任何第三方 TIFF 库，直接读取 TIFF IFD 中我们关心的 3 个标签：
-     * 256(ImageWidth)、257(ImageLength)、33550(ModelPixelScale)。
+     * <p>读取 TIFF 第一个 IFD 中我们关心的 5 个标签：
+     * 256(ImageWidth)、257(ImageLength)、33550(ModelPixelScale)、
+     * 33922(ModelTiepoint)、34735(GeoKeyDirectory)。
+     * 数值不在此做任何单位换算，由上层按坐标系类型决定。
      *
-     * @return 解析结果，失败返回 null
+     * @return 原始解析结果；不是合法 TIFF 时返回 null
      */
-    private static GeoTiffMeta parseGeoTiffMeta(byte[] bytes) {
+    private static RawGeoTiff parseRawGeoTiff(byte[] bytes) {
         if (bytes == null || bytes.length < 8) return null;
 
         try {
@@ -515,6 +512,8 @@ public class ImageTiler {
 
             int imageWidth = 0, imageLength = 0;
             double gsdX = -1, gsdY = -1;
+            double tieX = Double.NaN, tieY = Double.NaN;
+            short[] geoKeys = null;
 
             for (int i = 0; i < numEntries; i++) {
                 int tagId    = buf.getShort() & 0xFFFF;
@@ -537,23 +536,107 @@ public class ImageTiler {
                             gsdY = Math.abs(scales[1]);
                         }
                         break;
+                    case TAG_MODEL_TIEPOINT:
+                        // 6 个 double: I, J, K, X, Y, Z（我们只关心 X/Y）
+                        if (count >= 6 && dataType == TIFF_TYPE_DOUBLE) {
+                            double[] tp = readDoubleArray(valueOrOffset, count, buf, bytes);
+                            tieX = tp[3];
+                            tieY = tp[4];
+                        }
+                        break;
+                    case TAG_GEO_KEY_DIRECTORY:
+                        // GeoKeyDirectory：一堆 SHORT，用来判断坐标系类型
+                        if (dataType == TIFF_TYPE_SHORT && count > 0) {
+                            geoKeys = readShortArray(valueOrOffset, count, buf);
+                        }
+                        break;
                     default:
                         break;
                 }
             }
 
-            if (imageWidth > 0 && imageLength > 0) {
-                double gsd = (gsdX > 0 && gsdY > 0) ? (gsdX + gsdY) / 2.0 : -1;
-                double coverage = (gsd > 0)
-                        ? (imageWidth * gsd * imageLength * gsd) / 1_000_000.0
-                        : -1;
-                String level = classifyGSD(gsd);
-                return new GeoTiffMeta(gsd, coverage, level, imageWidth, imageLength);
+            if (imageWidth <= 0 || imageLength <= 0 || gsdX <= 0) {
+                return null;
             }
+            boolean geographic = isGeographicCoordinateSystem(geoKeys);
+            return new RawGeoTiff(imageWidth, imageLength, gsdX, gsdY, tieX, tieY, geographic);
         } catch (Exception e) {
             log.fine("Failed to parse TIFF metadata: " + e.getMessage());
         }
         return null;
+    }
+
+    /**
+     * 解析 GeoTIFF 元数据，得到 GSD（米/像素）、覆盖面积和图像尺寸。
+     *
+     * <p>注意 GSD 单位：投影坐标系（如 Web Mercator）下 ModelPixelScale 本身就是
+     * "米/像素"；但地理坐标系（EPSG:4326）下是"度/像素"，必须换算成米才能
+     * 参与策略分级和面积计算。
+     *
+     * @return 解析结果，失败返回 null
+     */
+    private static GeoTiffMeta parseGeoTiffMeta(byte[] bytes) {
+        RawGeoTiff raw = parseRawGeoTiff(bytes);
+        if (raw == null) return null;
+
+        double gsd;
+        if (raw.geographic) {
+            // 地理坐标系：度/像素 → 米/像素
+            double lat = Double.isNaN(raw.tieY) ? 0.0 : raw.tieY;
+            gsd = degreesPerPixelToMeters(raw.gsdX, raw.gsdY, lat);
+        } else if (raw.gsdX > 0 && raw.gsdY > 0) {
+            // 投影坐标系：本身就是米/像素，直接取平均
+            gsd = (raw.gsdX + raw.gsdY) / 2.0;
+        } else {
+            gsd = -1;
+        }
+
+        double coverage = (gsd > 0)
+                ? (raw.imageWidth * gsd * raw.imageHeight * gsd) / 1_000_000.0
+                : -1;
+        String level = classifyGSD(gsd);
+        return new GeoTiffMeta(gsd, coverage, level, raw.imageWidth, raw.imageHeight);
+    }
+
+    /**
+     * 判断 GeoTIFF 是地理坐标系（经纬度，度/像素）还是投影坐标系（米/像素）。
+     *
+     * <p>依据 GeoKeyDirectory 里的 GTModelTypeGeoKey（键 ID=1024）：
+     * 值为 2 表示地理坐标（EPSG:4326 经纬度），值为 1 表示投影坐标。
+     *
+     * @param geoKeys GeoKeyDirectory 的 SHORT 数组，可能为 null
+     * @return true=地理坐标系；false=投影坐标系或无法判断
+     */
+    private static boolean isGeographicCoordinateSystem(short[] geoKeys) {
+        if (geoKeys == null || geoKeys.length < 4) return false;
+        int numKeys = geoKeys[3] & 0xFFFF;   // 第 4 个 SHORT 是 key 数量
+        for (int k = 0; k < numKeys && (4 + k * 4 + 3) < geoKeys.length; k++) {
+            int keyId = geoKeys[4 + k * 4] & 0xFFFF;   // 每个 key 占 4 个 SHORT
+            if (keyId == GEO_KEY_MODEL_TYPE) {
+                return (geoKeys[4 + k * 4 + 3] & 0xFFFF) == MODEL_TYPE_GEOGRAPHIC;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 把地理坐标系（EPSG:4326）下"度/像素"的像元尺度换算成"米/像素"。
+     *
+     * <p>纬度方向：1 度 ≈ 111320 米（近似常数）；
+     * 经度方向：1 度 ≈ 111320 × cos(纬度) 米（经线越往两极越密集）。
+     * 返回两方向的平均值，用于 GSD 分级和覆盖面积估算。
+     *
+     * @param gsdXDeg 东西向像元尺度（度/像素）
+     * @param gsdYDeg 南北向像元尺度（度/像素）
+     * @param latitudeDeg 参考纬度（图片原点/中心纬度）
+     * @return 平均地面采样距离（米/像素）
+     */
+    private static double degreesPerPixelToMeters(double gsdXDeg, double gsdYDeg, double latitudeDeg) {
+        double metersPerDegreeLat = METERS_PER_DEGREE;                                          // 南北方向
+        double metersPerDegreeLng = METERS_PER_DEGREE * Math.cos(Math.toRadians(latitudeDeg));  // 东西方向
+        double gsdXM = gsdXDeg * metersPerDegreeLng;
+        double gsdYM = gsdYDeg * metersPerDegreeLat;
+        return (gsdXM + gsdYM) / 2.0;
     }
 
     private static int readIntValue(int dataType, int count, int valueOrOffset,
@@ -575,6 +658,17 @@ public class ImageTiler {
         buf.position(offset);
         for (int i = 0; i < result.length; i++) {
             result[i] = buf.getDouble();
+        }
+        buf.position(savedPos);
+        return result;
+    }
+
+    private static short[] readShortArray(int offset, int count, ByteBuffer buf) {
+        short[] result = new short[count];
+        int savedPos = buf.position();
+        buf.position(offset);
+        for (int i = 0; i < count; i++) {
+            result[i] = buf.getShort();
         }
         buf.position(savedPos);
         return result;

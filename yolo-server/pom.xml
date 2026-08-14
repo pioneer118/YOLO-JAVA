@@ -1,73 +1,106 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- 这是 XML 声明：版本 1.0，编码 UTF-8（支持中文） -->
+
+<!-- project 标签：Maven 项目文件的根标签（所有内容都在这对标签里） -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
          http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <!-- 上面三行是 XML 命名空间声明，固定写法，不用管 -->
+
     <modelVersion>4.0.0</modelVersion>
+    <!-- modelVersion：Maven 项目模型的版本，固定 4.0.0 -->
 
+    <!-- parent：父项目（父 POM）配置 -->
     <parent>
-        <groupId>com.yolo</groupId>
-        <artifactId>yolo-dist</artifactId>
-        <version>1.0.0</version>
+        <groupId>com.yolo</groupId>        <!-- 父项目的组织名 -->
+        <artifactId>yolo-dist</artifactId> <!-- 父项目的名字（根 pom.xml） -->
+        <version>1.0.0</version>           <!-- 父项目的版本 -->
     </parent>
+    <!-- 作用：继承父 POM 的公共配置（依赖版本、编译设置等），避免每个模块重复写 -->
 
+    <!-- 本模块自己的名字 -->
     <artifactId>yolo-server</artifactId>
+    <!-- 本模块的打包方式：jar 包 -->
     <packaging>jar</packaging>
 
+    <!-- dependencies：依赖列表，列出本模块要用到的所有库 -->
     <dependencies>
+
+        <!-- 依赖1：Spring Boot 核心（基础自动配置、IoC 容器） -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter</artifactId>
+            <groupId>org.springframework.boot</groupId>     <!-- 组织 -->
+            <artifactId>spring-boot-starter</artifactId>    <!-- 库名 -->
         </dependency>
-        <!-- 添加 web 容器（Tomcat），使 Actuator 端点能被 HTTP 访问。
-             之前只有 spring-boot-starter（无 web），导致 management.server.port:8100
-             的 /actuator/prometheus 端点无法暴露，Prometheus 抓取不到真实指标。 -->
+
+        <!-- 依赖2：Spring Boot Web（内嵌 Tomcat + Spring MVC） -->
+        <!-- 作用：让本服务能启动 HTTP 端口，暴露 Actuator 监控端点 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+
+        <!-- 依赖3：Dubbo 的 Spring Boot 集成（让 Dubbo 和 Spring Boot 配合） -->
         <dependency>
             <groupId>org.apache.dubbo</groupId>
             <artifactId>dubbo-spring-boot-starter</artifactId>
         </dependency>
+
+        <!-- 依赖4：Dubbo 的 Nacos 注册中心集成（让 Dubbo 注册到 Nacos） -->
         <dependency>
             <groupId>org.apache.dubbo</groupId>
             <artifactId>dubbo-nacos-spring-boot-starter</artifactId>
         </dependency>
+
+        <!-- 依赖5：自己项目的 yolo-proto 模块（接口 + Protobuf 消息） -->
         <dependency>
-            <groupId>com.yolo</groupId>
-            <artifactId>yolo-proto</artifactId>
+            <groupId>com.yolo</groupId>          <!-- 自己的组织 com.yolo -->
+            <artifactId>yolo-proto</artifactId> <!-- 依赖 proto 模块 -->
         </dependency>
+
+        <!-- 依赖6：自己项目的 yolo-inference 模块（推理引擎） -->
         <dependency>
-            <groupId>com.yolo</groupId>
-            <artifactId>yolo-inference</artifactId>
+            <groupId>com.yolo</groupId>               <!-- 自己的组织 -->
+            <artifactId>yolo-inference</artifactId>   <!-- 依赖推理引擎模块 -->
         </dependency>
+
+        <!-- 依赖7：fastjson（阿里的 JSON 序列化库） -->
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>fastjson</artifactId>
-            <version>2.0.53</version>
+            <version>2.0.53</version>   <!-- 指定版本 -->
         </dependency>
+
+        <!-- 依赖8：jackson 的时间类型支持（处理 LocalDateTime 等） -->
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
         </dependency>
-        <!-- Actuator + Prometheus 指标暴露 -->
+
+        <!-- 依赖9：Actuator（Spring Boot 的监控端点，如 /actuator/health） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+
+        <!-- 依赖10：Micrometer 的 Prometheus 集成（暴露指标给 Prometheus 抓取） -->
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
+
     </dependencies>
 
+    <!-- build：构建配置（怎么打包） -->
     <build>
         <plugins>
+            <!-- 插件：Spring Boot 打包插件 -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
+            <!-- 作用：把本模块打成"可执行的 fat jar"（内含所有依赖 + 内嵌 Tomcat），
+                 用 java -jar 就能直接运行 -->
         </plugins>
     </build>
 </project>

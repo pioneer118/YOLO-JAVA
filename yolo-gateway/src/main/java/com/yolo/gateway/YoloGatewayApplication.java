@@ -16,7 +16,7 @@ public class YoloGatewayApplication {
         SpringApplication.run(YoloGatewayApplication.class, args);
     }
 
-    @Bean
+    @Bean  //这个方法创建了一个"虚拟线程执行器"（一个能派活给线程干活的调度器），并放进 Spring 容器，供网关的调度逻辑使用。
     public ExecutorService virtualThreadExecutor() {
         return Executors.newVirtualThreadPerTaskExecutor();
     }

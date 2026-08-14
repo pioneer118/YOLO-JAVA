@@ -11,7 +11,7 @@ import { calcGsdResult, type GsdResult } from '../utils/gsdCalc'
 // ---- 基础参数 ----
 const selectedFile = ref<File | null>(null)
 const dataSource = ref('satellite')
-const confThreshold = ref(0.25)
+const confThreshold = ref(0.6)
 const loading = ref(false)
 
 // ---- 目标选择 ----

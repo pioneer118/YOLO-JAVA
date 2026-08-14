@@ -1,40 +1,72 @@
+# ============================================================
+# yolo-server 的配置文件
+# 作用：告诉 Spring Boot 和 Dubbo，这个模型服务该怎么运行
+# ============================================================
+
+# ---------- Spring Boot 配置 ----------
 spring:
+  # 应用基本信息
   application:
-    name: yolo-server
+    name: yolo-server        # 服务名字叫 yolo-server（注册到 Nacos 用）
 
+# ---------- Dubbo 配置 ----------
 dubbo:
+  # Dubbo 应用信息
   application:
-    name: ${spring.application.name}
+    name: ${spring.application.name}   # Dubbo 应用名 = Spring 应用名（yolo-server）
+
+  # 通信协议配置：这个服务怎么对外提供模型检测能力
   protocol:
-    name: tri
-    port: 0
+    name: tri                  # 用 Triple 协议（Dubbo 的 HTTP/2 + Protobuf 协议）
+    port: 0                    # 端口 0 = 由启动参数指定（8001/8002/8003，三个实例各不同）
+
+  # 注册中心配置
   registry:
-    address: nacos://127.0.0.1:8848
-    register-mode: instance
+    address: nacos://127.0.0.1:8848    # 注册到 Nacos（地址 127.0.0.1，端口 8848）
+    register-mode: instance             # 以"实例"模式注册（Dubbo 3 推荐）
+
+  # 提供方配置：这个服务是"服务提供方"（被别人调用）
   provider:
-    timeout: 30000
+    timeout: 30000             # 别人调用我，最多等 30000 毫秒 = 30 秒（推理可能慢）
+
+  # 扫描配置：告诉 Dubbo 去哪个包找注解
   scan:
-    base-packages: com.yolo.server
+    base-packages: com.yolo.server     # 扫描这个包下的 @DubboService / @DubboReference
 
+# ---------- 项目自定义配置 ----------
 yolo:
-  model-path: ""
-  model-type: ship
+  model-path: ""              # 模型文件路径（启动时用 --yolo.model-path 指定）
+  model-type: ship            # 模型类型：ship/plane/car（启动时指定）
 
+# ============================================================
 # ---- Actuator + Prometheus 指标暴露 ----
+# 作用：把服务的"健康状态"和"性能指标"暴露出来，供 Prometheus 监控系统抓取
+# ============================================================
 management:
+  # 端点（endpoints）配置
   endpoints:
     web:
+      # 暴露哪些端点（监控功能）
       exposure:
         include: health,metrics,prometheus
-      base-path: /actuator
+        # health     = 健康检查（服务挂了没）
+        # metrics    = 性能指标（内存、CPU、耗时等）
+        # prometheus = 转成 Prometheus 能读的格式
+      base-path: /actuator    # 端点地址前缀（访问 http://localhost:8100/actuator/health）
+
+  # 具体端点的配置
   endpoint:
     health:
-      show-details: always
+      show-details: always    # 健康检查显示详细信息（磁盘、内存等组件状态，不只是 UP/DOWN）
+
+  # 指标（metrics）配置
   metrics:
     export:
       prometheus:
-        enabled: true
+        enabled: true         # 开启 Prometheus 指标导出（让 Prometheus 能抓取指标）
     tags:
-      application: ${spring.application.name}
+      application: ${spring.application.name}   # 给指标打"应用名"标签，方便区分是哪个服务
+
+  # 管理端口（与 Dubbo 业务端口分离）
   server:
-    port: 8100  # 管理端口（与 Dubbo 业务端口分离）
+    port: 8100                # 监控端口用 8100，业务端口（8001）走业务流量，互不干扰

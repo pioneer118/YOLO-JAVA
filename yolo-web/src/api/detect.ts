@@ -66,7 +66,7 @@ export interface DroneParams {
 export async function detectImage(
   file: File,
   dataSource: string = 'satellite',
-  confThreshold: number = 0.5,
+  confThreshold: number = 0.6,
   droneParams?: DroneParams,
   targets?: string[]
 ): Promise<DetectResult> {
