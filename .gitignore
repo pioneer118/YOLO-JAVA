@@ -51,6 +51,7 @@ models/backup/
 
 ### 大文件测试图(超 GitHub 100MB 限制) ###
 testimage/*.tif
+models/*.old
 
 ### 临时调试/训练脚本 ###
 _ssh_*.py

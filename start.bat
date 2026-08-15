@@ -8,10 +8,10 @@ REM  YOLO-RPC Distributed Object Detection - One-Click Start
 REM ============================================================
 
 REM ---------- Config (edit if needed) ----------
-set "PROJECT=C:\Users\��\IdeaProjects\YOLO-RPC"
+set "PROJECT=%USERPROFILE%\IdeaProjects\YOLO-RPC"
 set "JAVA=D:\develop\JDK\bin\java.exe"
-set "ONNX_LIB=C:\Users\��\tools\onnxruntime\onnxruntime-win-x64-1.26.0\lib\onnxruntime.dll"
-set "NACOS_JAR=C:\Users\��\tools\nacos\target\nacos-server.jar"
+set "ONNX_LIB=%USERPROFILE%\tools\onnxruntime\onnxruntime-win-x64-1.26.0\lib\onnxruntime.dll"
+set "NACOS_JAR=%USERPROFILE%\tools\nacos\target\nacos-server.jar"
 set "MODELS=%PROJECT%\models"
 set "LOGS=%PROJECT%\logs"
 REM ----------------------------------------
@@ -47,22 +47,27 @@ powershell -NoProfile -Command "Start-Process -FilePath '%JAVA%' -ArgumentList '
 call :wait_port 8848 "Nacos"
 
 REM ---------- 2. yolo-server x3 ----------
-echo [2/6] Starting yolo-server (ship:8001 / plane:8002 / car:8003)...
-powershell -NoProfile -Command "Start-Process -FilePath '%JAVA%' -ArgumentList '-Xmx1536m','-Donnxruntime.lib.path=%ONNX_LIB%','-jar','%PROJECT%\yolo-server\target\yolo-server-1.0.0.jar','--yolo.model-path=%MODELS%\bestship.onnx','--yolo.model-type=ship','--dubbo.protocol.port=8001','--server.port=18001','--management.server.port=18101','--dubbo.application.qos-enable=false' -WindowStyle Hidden -RedirectStandardOutput '%LOGS%\server-ship.log' -RedirectStandardError '%LOGS%\server-ship.err.log'"
+echo [2/6] Starting yolo-server (ship x3: 8001/8011/8021, plane:8002, car:8003)...
+REM ---- ship 多实例(3份)，都注册 group=ship，Dubbo 自动负载均衡 ----
+powershell -NoProfile -Command "Start-Process -FilePath '%JAVA%' -ArgumentList '-Xmx1536m','-Donnxruntime.lib.path=%ONNX_LIB%','-jar','%PROJECT%\yolo-server\target\yolo-server-1.0.0.jar','--yolo.model-path=%MODELS%\bestship.onnx','--yolo.model-type=ship','--dubbo.protocol.port=8001','--server.port=18001','--management.server.port=18101','--dubbo.application.qos-enable=false' -WindowStyle Hidden -RedirectStandardOutput '%LOGS%\server-ship-1.log' -RedirectStandardError '%LOGS%\server-ship-1.err.log'"
+powershell -NoProfile -Command "Start-Process -FilePath '%JAVA%' -ArgumentList '-Xmx1536m','-Donnxruntime.lib.path=%ONNX_LIB%','-jar','%PROJECT%\yolo-server\target\yolo-server-1.0.0.jar','--yolo.model-path=%MODELS%\bestship.onnx','--yolo.model-type=ship','--dubbo.protocol.port=8011','--server.port=18011','--management.server.port=18111','--dubbo.application.qos-enable=false' -WindowStyle Hidden -RedirectStandardOutput '%LOGS%\server-ship-2.log' -RedirectStandardError '%LOGS%\server-ship-2.err.log'"
+powershell -NoProfile -Command "Start-Process -FilePath '%JAVA%' -ArgumentList '-Xmx1536m','-Donnxruntime.lib.path=%ONNX_LIB%','-jar','%PROJECT%\yolo-server\target\yolo-server-1.0.0.jar','--yolo.model-path=%MODELS%\bestship.onnx','--yolo.model-type=ship','--dubbo.protocol.port=8021','--server.port=18021','--management.server.port=18121','--dubbo.application.qos-enable=false' -WindowStyle Hidden -RedirectStandardOutput '%LOGS%\server-ship-3.log' -RedirectStandardError '%LOGS%\server-ship-3.err.log'"
 powershell -NoProfile -Command "Start-Process -FilePath '%JAVA%' -ArgumentList '-Xmx1536m','-Donnxruntime.lib.path=%ONNX_LIB%','-jar','%PROJECT%\yolo-server\target\yolo-server-1.0.0.jar','--yolo.model-path=%MODELS%\bestplane.onnx','--yolo.model-type=plane','--dubbo.protocol.port=8002','--server.port=18002','--management.server.port=18102','--dubbo.application.qos-enable=false' -WindowStyle Hidden -RedirectStandardOutput '%LOGS%\server-plane.log' -RedirectStandardError '%LOGS%\server-plane.err.log'"
 powershell -NoProfile -Command "Start-Process -FilePath '%JAVA%' -ArgumentList '-Xmx1g','-Donnxruntime.lib.path=%ONNX_LIB%','-jar','%PROJECT%\yolo-server\target\yolo-server-1.0.0.jar','--yolo.model-path=%MODELS%\bestcar.onnx','--yolo.model-type=car','--dubbo.protocol.port=8003','--server.port=18003','--management.server.port=18103','--dubbo.application.qos-enable=false' -WindowStyle Hidden -RedirectStandardOutput '%LOGS%\server-car.log' -RedirectStandardError '%LOGS%\server-car.err.log'"
-call :wait_port 8001 "ship"
+call :wait_port 8001 "ship-1"
+call :wait_port 8011 "ship-2"
+call :wait_port 8021 "ship-3"
 call :wait_port 8002 "plane"
 call :wait_port 8003 "car"
 
 REM ---------- 3. Gateway ----------
 echo [3/6] Starting gateway (9000)...
-powershell -NoProfile -Command "Start-Process -FilePath '%JAVA%' -ArgumentList '-Xmx1g','-jar','%PROJECT%\yolo-gateway\target\yolo-gateway-1.0.0.jar','--dubbo.protocol.port=9000' -WindowStyle Hidden -RedirectStandardOutput '%LOGS%\gateway.log' -RedirectStandardError '%LOGS%\gateway.err.log'"
+powershell -NoProfile -Command "Start-Process -FilePath '%JAVA%' -ArgumentList '-Xmx2g','-jar','%PROJECT%\yolo-gateway\target\yolo-gateway-1.0.0.jar','--dubbo.protocol.port=9000' -WindowStyle Hidden -RedirectStandardOutput '%LOGS%\gateway.log' -RedirectStandardError '%LOGS%\gateway.err.log'"
 call :wait_port 9000 "gateway"
 
 REM ---------- 4. Web API ----------
 echo [4/6] Starting web-api (8080)...
-powershell -NoProfile -Command "Start-Process -FilePath '%JAVA%' -ArgumentList '-Xmx384m','-jar','%PROJECT%\yolo-web-api\target\yolo-web-api-1.0.0.jar','--server.port=8080' -WindowStyle Hidden -RedirectStandardOutput '%LOGS%\web-api.log' -RedirectStandardError '%LOGS%\web-api.err.log'"
+powershell -NoProfile -Command "Start-Process -FilePath '%JAVA%' -ArgumentList '-Xmx2g','-jar','%PROJECT%\yolo-web-api\target\yolo-web-api-1.0.0.jar','--server.port=8080' -WindowStyle Hidden -RedirectStandardOutput '%LOGS%\web-api.log' -RedirectStandardError '%LOGS%\web-api.err.log'"
 call :wait_port 8080 "web-api"
 
 REM ---------- 5. Frontend ----------
